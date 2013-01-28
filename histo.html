@@ -24,6 +24,7 @@ svg {
   shape-rendering: crispEdges;
 }
 .resize rect {
+  visibility: visible !important;
   fill: #333;
   fill-opacity: .8;
   stroke: #555;
@@ -52,9 +53,9 @@ function load() {
 
   var rgb = d3.scale.ordinal().domain(d3.range(3)).range(["red", "green", "blue"])
   var xH = d3.scale.linear().domain([0, 255]).range([0, width]);
-  var yH = d3.scale.linear().domain([0, 100]).range([10, 0]);
+  var yH = d3.scale.linear().range([0, height / 4]);
 
-  var histo;
+  var svg, canvas, histo;
 
   function histogram(extent, context) {
     var x = width  *  extent[0][0],
@@ -75,6 +76,9 @@ function load() {
       d[2][p[i++]]++;
     } while(++i < p.length)
 
+    var max = Math.max(d3.max(d[0]), d3.max(d[1]), d3.max(d[2]));
+    yH.domain([0, max]);
+
     return d;
   }
 
@@ -90,9 +94,9 @@ function load() {
       .data(data).enter()
       .append("path")
       .attr("class", "histo")
-      .attr("d", area)
       .attr("fill", function(d, i) { return rgb(i); })
       .attr("stroke", function(d, i) { return rgb(i); });
+    redraw();
   }
 
   function redraw() {
@@ -102,7 +106,7 @@ function load() {
   var area = d3.svg.area()
     .x(function(d, i) { return xH(i); })
     .y0(height)
-    .y1(function(d) { return height + yH(d); })
+    .y1(function(d) { return height - yH(d); })
     .interpolate("basis");
 
   var brush = d3.svg.brush()
@@ -111,13 +115,13 @@ function load() {
     .extent([[.4, .4],[.6, .6]])
     .on("brush", brushmove);
 
-  var svg = d3.select("#main")
+  svg = d3.select("#main")
     .append("svg")
       .attr("width", width)
       .attr("height", height)
     .append("g")
 
-  var canvas = d3.select("#main")
+  canvas = d3.select("#main")
     .append("canvas")
     .attr("width", width)
     .attr("height", height)
@@ -128,16 +132,9 @@ function load() {
       draw();
     });
 
-  var brushg = svg.append("g")
-    .attr("class", "brush")
-    .call(brush);
-
-  brushg.selectAll('rect');
-
-  var resize = brushg.selectAll('.resize').select("rect")
-    .attr("x", 0)
-    .attr("y", 0)
-    .attr("style", "");
+  svg.append("g")
+      .attr("class", "brush")
+      .call(brush);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
