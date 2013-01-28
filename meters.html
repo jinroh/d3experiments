@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>D3</title>
+<script src="d3.js"></script>
+</head>
+<body>
+<script>
+var n = 10,
+    w = 960,
+    h = 500,
+    R = 100,
+    r = 10,
+    size = 50,
+    color = d3.scale.category20();
+    data = [];
+
+var x   = d3.scale.linear().range([0, w]).clamp(true);
+var inv = d3.scale.pow().exponent(2).domain([0,size]).range([R-r/2,r]);
+var arc = d3.svg.arc()
+  .innerRadius(inv)
+  .outerRadius(R)
+  .startAngle(0)
+  .endAngle(function(d, i) { return (i%2 || -1) * (d / size) * 2 * Math.PI; });
+
+function interpolator(fn) {
+  return function(d, i) {
+    var inte  = d3.interpolate(this.current || 0, d.value),
+        inte_ = function(t) { return (this.current = inte(t)); }.bind(this);
+    return function(t) {
+      return (typeof fn === "function" ? fn : this[fn]).call(this, inte_(t), i);
+    }.bind(this);
+  }
+}
+
+function bindRamp(d, i) {
+  this.ramp = d3.scale.linear().domain([0, size]).range([color(i), color(i+1)]);
+}
+
+var timeout;
+function defer(fn, val) {
+  clearTimeout(timeout);
+  timeout = setTimeout(function() { fn(val); }, 0);
+}
+
+var vis = d3.select("body")
+  .append("svg")
+    .attr("width", w)
+    .attr("height", h)
+  .append("g")
+    .attr("transform", "translate(" + R + "," + R + ")");
+
+function draw(data) {
+  x.domain([0, data.length]);
+
+  var arcs = vis.selectAll("g").data(data);
+
+  var enter = arcs.enter().append("g")
+  enter.append("path").each(bindRamp);
+  enter.append("text").each(bindRamp)
+    .text(function(d) { return d.name; })
+      .attr("fill", function(d, i) { return color(i); });
+
+  arcs.transition()
+    .attr("transform", function(d, i) { return "translate(" + x(i) + ",0)"; })
+    .select("path")
+
+  arcs.select("path")
+    .transition()
+    .duration(1000)
+    .attrTween("d", interpolator(arc))
+    .attrTween("fill", interpolator("ramp"));
+
+  arcs.exit()
+    .transition()
+    .delay(1000)
+    .attr("transform", "scale(0)");
+}
+
+function update(pos, value) {
+  data[pos] = data[pos] || {};
+  data[pos].value = value || Math.floor(Math.random() * size);
+  data[pos].name = 'foo' + pos;
+  defer(draw, data);
+}
+
+var j = 0;
+setInterval(function() {
+  if (j < n) {
+    update(j++);
+  } else {
+    update(Math.floor(Math.random() * data.length));
+    update(Math.floor(Math.random() * data.length));
+    update(Math.floor(Math.random() * data.length));
+  }
+}, 1000);
+</script>
+</body>
+</html>
