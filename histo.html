@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <script src="d3.js"></script>
 <style>
+body {
+  font: 10px sans-serif;
+}
+#main {
+  position: relative;
+}
+canvas {
+  padding: 0;
+  margin: 0;
+}
+svg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
 .brush .extent {
   fill-opacity: .3;
   shape-rendering: crispEdges;
@@ -14,20 +29,9 @@
   stroke: #555;
   stroke-width: 1.5px;
 }
-body {
-  font: 10px sans-serif;
-}
-#main {
-  position: relative;
-}
-svg {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-}
-canvas {
-  padding: 0;
-  margin: 0;
+.histo {
+  fill-opacity: .4;
+  stroke-width: 2;
 }
 </style>
 <title></title>
@@ -42,8 +46,9 @@ function load() {
       height = this.height,
       data = [];
 
-  var x = d3.scale.linear().range([0, width - 5]);
-  var y = d3.scale.linear().range([0, height - 5]);
+  var brushsize = 5;
+  var x = d3.scale.linear().range([0, width - brushsize]);
+  var y = d3.scale.linear().range([brushsize, height - brushsize]);
 
   var rgb = d3.scale.ordinal().domain(d3.range(3)).range(["red", "green", "blue"])
   var xH = d3.scale.linear().domain([0, 255]).range([0, width]);
@@ -86,7 +91,8 @@ function load() {
       .append("path")
       .attr("class", "histo")
       .attr("d", area)
-      .attr("fill", function(d, i) { return rgb(i); });
+      .attr("fill", function(d, i) { return rgb(i); })
+      .attr("stroke", function(d, i) { return rgb(i); });
   }
 
   function redraw() {
