@@ -57,24 +57,28 @@ function load() {
 
   var svg, canvas, histo;
 
+  var empty = Array(256);
+  for (var i = 0; i < 256; i++) { empty[i] = 0; }
+
   function histogram(extent, context) {
     var x = width  *  extent[0][0],
         y = height *  extent[0][1],
         w = width  * (extent[1][0] - extent[0][0]),
         h = height * (extent[1][1] - extent[0][1]),
         p = context.getImageData(x, y, w, h).data,
-        d = d3.range(3).map(Array);
+        d = d3.range(3).map(function() {
+          return empty.slice();
+        });
 
-    for (var i = 0; i < 256; i++) {
-      d[0][i] = 0, d[1][i] = 0, d[2][i] = 0;
-    }
+    var jump = 4 * Math.pow(Math.floor(p.length / 1e6), 2);
 
     i = 0;
     do {
       d[0][p[i++]]++;
       d[1][p[i++]]++;
       d[2][p[i++]]++;
-    } while(++i < p.length)
+      i += (jump + 1)
+    } while(i < p.length)
 
     var max = Math.max(d3.max(d[0]), d3.max(d[1]), d3.max(d[2]));
     yH.domain([0, max]);
