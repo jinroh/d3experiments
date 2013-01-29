@@ -9,6 +9,8 @@ body {
 }
 #main {
   position: relative;
+  width: 50%;
+  margin: auto;
 }
 canvas {
   padding: 0;
@@ -40,20 +42,21 @@ svg {
 <body>
 <div id="main"></div>
 <script>
+'use strict';
+
 function load() {
-  var image = this;
+  var image  = this,
+      width  = image.width,
+      height = image.height,
+      data   = [],
 
-  var width = this.width,
-      height = this.height,
-      data = [];
+      brushsize = 6,
+      x = d3.scale.linear().range([0, width - brushsize]),
+      y = d3.scale.linear().range([brushsize, height - brushsize]),
 
-  var brushsize = 6;
-  var x = d3.scale.linear().range([0, width - brushsize]);
-  var y = d3.scale.linear().range([brushsize, height - brushsize]);
-
-  var rgb = d3.scale.ordinal().domain(d3.range(3)).range(["red", "green", "blue"])
-  var xH = d3.scale.linear().domain([0, 255]).range([0, width]);
-  var yH = d3.scale.linear().range([0, height / 4]);
+      rgb = d3.scale.ordinal().domain(d3.range(3)).range(["red", "green", "blue"]),
+      xH = d3.scale.linear().domain([0, 255]).range([0, width]),
+      yH = d3.scale.linear().range([0, height / 4]);
 
   var svg, canvas, histo;
 
