@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>D3</title>
+<script src="d3.js"></script>
+<style>
+.dht {
+  fill: lightgrey;
+  stroke: grey;
+}
+circle {
+  fill: #666;
+  stroke: #111;
+}
+</style>
+</head>
+<body>
+<script>
+function b2h(bytes) {
+  for (var hex = [], i = 0; i < bytes.length; i++) {
+    hex.push((bytes[i] >>> 4).toString(16));
+    hex.push((bytes[i] & 0xF).toString(16));
+  }
+  return hex.join("");
+}
+
+function sha1() {
+  return d3.range(20).map(function() {
+    return Math.floor(Math.random() * 256);
+  });
+}
+
+var data = d3.range(10).map(sha1);
+
+var w = 800,
+    h = 800,
+    R = 250,
+    r = 50,
+    c = (R - r / 2),
+    color = d3.scale.category20();
+
+var theta = d3.scale.linear().domain([0, 255]).range([0, 2 * Math.PI]);
+
+function interpolate(d) {
+  var i = d3.interpolate(this.current || d[0], d[0]);
+  var self = this;
+  return function(t) {
+    var current = self.current = i(t);
+    return "translate(" + c * Math.cos(theta(current)) + "," + c * Math.sin(theta(current)) + ")";
+  }
+}
+
+var arc = d3.svg.arc()
+  .innerRadius(R - r)
+  .outerRadius(R)
+  .startAngle(0)
+  .endAngle(2 * Math.PI);
+
+var vis = d3.select("body")
+  .append("svg")
+    .attr("width", w)
+    .attr("height", h)
+  .append("g")
+    .attr("transform", "translate(" + w / 2 + "," + h / 2 + ")");
+
+vis.append("path")
+  .attr("d", arc)
+  .attr("class", "dht");
+
+var circles = vis.selectAll("circle").data(data);
+
+circles.enter().append("circle")
+  .attr("r", 5);
+
+function draw() {
+  data = d3.range(10).map(sha1);
+  circles.data(data)
+    .transition()
+    .duration(2000)
+    .attrTween("transform", interpolate)
+}
+
+draw();
+setInterval(draw, 2000);
+</script>
+</body>
+</html>
