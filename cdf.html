@@ -30,37 +30,38 @@ svg {
 </head>
 <body>
 <div id="main"></div>
-<input type="checkbox" id="normalize">
 <script>
 'use strict';
 function load() {
   var image  = this,
       width  = image.width,
       height = image.height,
-      data   = [[]],
+      data   = d3.range(3).map(function() { return [] }),
 
-      rgb = d3.scale.ordinal().domain(d3.range(2)).range(["red", "blue"]),
+      rgb = d3.scale.ordinal().domain(d3.range(3)).range(["red", "green", "blue"]),
       x = d3.scale.linear().domain([0, 255]).range([0, width]),
-      y = d3.scale.linear().range([0, height / 4]);
+      y = d3.scale.linear().range([0, height / 4]),
 
-  var svg, canvas, histo;
+      histos = ["red", "green", "blue"];
+
+  var svg, histo, pixels, canvas;
 
   var empty = Array(256);
   for (var i = 0; i < 256; i++) { empty[i] = 0; }
 
-  function histogram(p) {
+  function histogram(p, i) {
     var d = empty.slice();
-    for (var i = 2; i < p.length; i += 4) {
-      d[p[i]]++;
+    for (; i < p.data.length; i += 4) {
+      d[p.data[i]]++;
     }
     return d;
   }
 
-  function normalize(p) {
-    var H = histogram(p),
-        c = cdf(H, p.length / 4);
-    for (var i = 2; i < p.length; i += 4) {
-      p[i] = (H.length - 1) * c[p[i]];
+  function normalize(p, i) {
+    var H = histogram(p, i),
+        c = cdf(H, p.data.length / 4);
+    for (; i < p.data.length; i += 4) {
+      p.data[i] = Math.floor((H.length - 1) * c[p.data[i]]) | 0;
     }
     return p;
   }
@@ -84,34 +85,43 @@ function load() {
       .attr("height", height)
     .append("g")
 
-  canvas = d3.select("#main")
+  d3.select("#main")
     .append("canvas")
     .attr("width", width)
     .attr("height", height)
     .each(function() {
-      this.context = this.getContext('2d');
-      this.context.drawImage(image, 0, 0);
-    })
-    .each(function() {
-      var p = this.context.getImageData(0, 0, width, height).data,
-          H = histogram(p);
-      y.domain([0, d3.max(H)]);
-      data = [H];
-      draw();
+      var context = this.getContext('2d');
+      context.drawImage(image, 0, 0);
+      pixels = function() {
+        return context.getImageData(0, 0, width, height);
+      }
+      canvas = function(pixels) {
+        context.putImageData(pixels, 0, 0);
+      }
     });
 
-  d3.select("#normalize").on("change", function() {
-    var checked = this.checked;
-    canvas.each(function() {
-      var p = this.context.getImageData(0, 0, width, height).data,
-          H = checked ? histogram(normalize(p)) : histogram(p);
-      y.domain([0, d3.max(H)]);
-      data = [H];
+  d3.select("#main").selectAll("input")
+    .data(histos).enter().append("input")
+    .attr("type", "checkbox")
+    .each(function(d, i) {
+      data[i] = histogram(pixels(), i);
+    })
+    .on("change", function(d, i) {
+      var h, n;
+      if (this.checked) {
+        n = normalize(pixels(), i);
+        h = histogram(n, i);
+        canvas(n);
+      } else {
+        h = histogram(pixels(), i);
+      }
+      data[i] = h;
       redraw();
     })
-  });
 
   function draw() {
+    var max = Math.max(d3.max(data[0]), d3.max(data[1]), d3.max(data[2]));
+    y.domain([0, max]);
     histo = svg.selectAll(".histo")
       .data(data).enter().append("path")
       .attr("class", "histo")
@@ -121,11 +131,15 @@ function load() {
   }
 
   function redraw() {
+    var max = Math.max(d3.max(data[0]), d3.max(data[1]), d3.max(data[2]));
+    y.domain([0, max]);
     histo.data(data)
       .transition()
-      .duration(2000)
+      .duration(1000)
       .attr("d", area);
   }
+
+  draw();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
