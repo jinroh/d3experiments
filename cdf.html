@@ -67,10 +67,11 @@ function load() {
   }
 
   function cdf(histo, size) {
-    return histo.reduce(function(cdf, v, i) {
-      cdf.push((v / size + (cdf[i - 1] || 0)));
-      return cdf;
-    }, []);
+    var cdf = [histo[0] / size];
+    for (var i = 1; i < histo.length; i++) {
+      cdf[i] = histo[i] / size + cdf[i - 1];
+    }
+    return cdf;
   }
 
   var area = d3.svg.area()
