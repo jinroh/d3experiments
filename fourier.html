@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<style>
+body {
+  font: 13px/13px "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: auto;
+  position: relative;
+  width: 1080px;
+}
+form {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+}
+.main {
+  fill: none;
+  stroke: hsl(0, 0%, 30%);
+}
+.dot {
+  fill: hsla(0, 100%, 34%, 0.2);
+}
+.dot.last {
+  fill: hsla(0, 100%, 34%, 1.0);
+}
+.coeff {
+  fill: none;
+  stroke: hsl(0, 0%, 70%);
+}
+.graph {
+  fill: none;
+  stroke: hsl(0, 100%, 34%);
+  stroke-width: 3px;
+}
+.trace {
+  fill: none;
+  stroke: hsl(0, 0%, 34%);
+}
+.proj {
+  fill: none;
+  stroke: #000;
+}
+.axis {
+  stroke: hsl(0, 0%, 70%);
+}
+</style>
+</head>
+<body>
+<form>
+  <p>
+    <input id="play" type="checkbox" value="1" checked>
+    <select id="type">
+      <option value="square">Square</option>
+      <option value="triangle">Triangle</option>
+      <option value="sawtooth">Sawtooth</option>
+      <option value="fibonacci">Fibonacci</option>
+      <option value="pulse">Pulse</option>
+    </select>
+  </p>
+  <p><input id="size" type="range" value="5" min="1" max="100" step="1"> <label>Precision</label></p>
+  <p><input id="freq" type="range" value="0.1" min="0.01" max="1" step="0.01"> <label>Speed</label></p>
+</form>
+<script src="d3.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  var π = Math.PI
+
+  var types = {
+    square: function(n) {
+      return (((n + 1) % 2) ? 0 : 1) / n;
+    },
+    triangle: function(n) {
+      if (!(n % 2)) return 0;
+      return ((n % 4 === 1) ? 1 : -1) / (n * n);
+    },
+    sawtooth: function(n) {
+      return ((n % 2) ? -1 : 1) / (n + 1);
+    },
+    fibonacci: function(n) {
+      var fst = 0.01, sec = 0.01, add;
+      for (var i = 0; i < n; i++) {
+        add = fst + sec;
+        fst = sec;
+        sec = add;
+      }
+      return add;
+    },
+    pulse: function(n) {
+      return 0.1;
+    }
+  };
+
+  function FT(N, s) {
+    return function(x) {
+      var n = -1, y = 0;
+      while (++n < N + 1) {
+        y += A[n] * s((n + 1) * x);
+      }
+      return y;
+    }
+  }
+
+  var
+    margin = {top: 40, right: 100, bottom: 40, left: 150},
+    W = 1080,
+    H = 500,
+    w = W - margin.left - margin.right,
+    h = H - margin.top - margin.bottom,
+
+    radius = 140,
+    theta  = 0.1,
+    xmax   = 3 * π,
+    domain = d3.range(0, xmax, xmax / 1000),
+    rate   = 1 / 60,
+
+    C = types.square, // coeffiecients
+    L = 5,            // size
+    F = 1 / 10,       // frequence
+
+    yCirc = d3.scale.linear().domain([-1, 1]).range([h/2 + radius, h/2 - radius]),
+    xCirc = d3.scale.linear().domain([-1, 1]).range([0, 2 * radius]),
+    xAxis = d3.scale.linear().domain([0, xmax]).range([0, w]),
+    rAxis = d3.scale.linear().domain([0, 1]).range([0, radius]),
+
+    A, Fxy, fx, fy,
+
+    timer, data = [];
+
+  var graph = d3.svg.line()
+    .x(function(d) { return xAxis(d); })
+    .y(function(d) { return yCirc(fy(theta - d)); });
+
+  var proj = d3.svg.line()
+    .x(function(d) { return xCirc(d.x); })
+    .y(function(d) { return yCirc(d.y); });
+
+  var trace = d3.svg.line()
+    .x(function(d) { return xCirc(fx(d)); })
+    .y(function(d) { return yCirc(fy(d)); });
+
+  var svg = d3.select("body")
+    .append("svg")
+      .attr("width", W)
+      .attr("height", H)
+
+  svg.append('line')
+    .attr('class', 'axis')
+    .attr('y1', margin.top + yCirc(0)).attr('x1', 0)
+    .attr('y2', margin.top + yCirc(0)).attr('x2', W);
+
+  svg.append('line')
+    .attr('class', 'axis')
+    .attr('x1', margin.left + xCirc(0)).attr('y1', 0)
+    .attr('x2', margin.left + xCirc(0)).attr('y2', H);
+
+  var vis = svg.append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  var gPath = vis.append("path")
+    .attr("class", "graph")
+    .attr("transform", "translate(" + rAxis(1) + ",0)");
+
+  var tPath = vis.append("path")
+    .attr("class", "trace");
+
+  var line = vis.append("path")
+    .attr("class", "proj");
+
+  function cache() {
+    if (typeof C === 'function') {
+      A = d3.range(1, L + 1).map(C);
+    } else {
+      A = C.slice(0, L);
+    }
+
+    fx = FT(L - 1, Math.cos);
+    fy = FT(L - 1, Math.sin),
+
+    Fxy = A.map(function(a, i) {
+      return { X: FT(i, Math.cos), Y: FT(i, Math.sin) };
+    });
+
+    tPath.attr("d", trace(domain));
+  }
+
+  function calc() {
+    if (!Fxy) cache();
+    Fxy.forEach(function(f, i) {
+      var d = data[i] || (data[i] = {x:0,y:0,r:0});
+      d.x = f.X(theta);
+      d.y = f.Y(theta);
+      d.r = (i < A.length - 1) ? Math.abs(A[i + 1]) : 0;
+    });
+    data.length = Fxy.length;
+  }
+
+  function draw() {
+    calc();
+
+    var main = vis.selectAll('.main').data([A[0]])
+      .attr("r", rAxis)
+    main.enter().append("circle")
+        .attr("class", "main")
+        .attr("cx", xCirc(0))
+        .attr("cy", yCirc(0));
+
+    var circles = vis.selectAll(".coeff").data(data)
+      .attr("cx", function(d) { return xCirc(d.x); })
+      .attr("cy", function(d) { return yCirc(d.y); })
+      .attr("r",  function(d) { return rAxis(d.r); });
+    circles.exit().remove();
+    circles.enter().append("circle")
+      .attr("class", "coeff");
+
+    var dots = vis.selectAll(".dot").data(data)
+      .attr("cx", function(d) { return xCirc(d.x); })
+      .attr("cy", function(d) { return yCirc(d.y); })
+      .classed("last", function(d, i) { return i === L - 1; });
+    dots.exit().remove();
+    dots.enter().append("circle")
+      .attr("class", "dot")
+      .attr("r", 3);
+
+    var last = data[data.length - 1];
+    line.attr("d", proj([last, {x:0,y:last.y}]));
+    gPath.attr("d", graph(domain));
+  }
+
+  play();
+
+  function play() {
+    if (timer) return;
+    (function loop() {
+      draw();
+      theta += 2 * π * F * rate;
+      timer = setTimeout(loop, rate * 1000);
+    })();
+  }
+
+  function pause() {
+    if (!timer) return;
+    clearTimeout(timer);
+    timer = null;
+  }
+
+  d3.select("#play").on("change", function() { this.checked ? play() : pause(); });
+  d3.select("#freq").on("change", function() { F = +this.value; cache(); draw();h });
+  d3.select("#size").on("change", function() { L = +this.value; cache(); draw(); });
+  d3.select("#type").on("change", function() { C = types[this.value]; cache(); draw(); });
+
+})();
+</script>
+</body>
