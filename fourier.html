@@ -13,9 +13,8 @@ form {
   bottom: 10px;
   right: 10px;
 }
-.main {
-  fill: none;
-  stroke: hsl(0, 0%, 30%);
+.hide {
+  display: none;
 }
 .dot {
   fill: hsla(207, 63%, 27%, 0.2);
@@ -26,6 +25,13 @@ form {
 .coeff {
   fill: none;
   stroke: hsl(0, 0%, 70%);
+}
+.coeff.first {
+  fill: none;
+  stroke: hsl(0, 0%, 30%);
+}
+.coeff.last {
+  display: none;
 }
 .graph {
   fill: none;
@@ -57,8 +63,8 @@ form {
       <option value="pulse">Pulse</option>
     </select>
   </p>
-  <p><input id="size" type="range" value="5" min="1" max="100" step="1"> <label>Precision</label></p>
-  <p><input id="freq" type="range" value="0.1" min="0.01" max="1" step="0.01"> <label>Speed</label></p>
+  <p><input id="size" type="range" value="6" min="1" max="100" step="1"> <label>Precision</label></p>
+  <p><input id="freq" type="range" value="0.3" min="0.01" max="0.5" step="0.01"> <label>Speed</label></p>
 </form>
 <script src="d3.js"></script>
 <script>
@@ -96,8 +102,8 @@ form {
   function FT(N, s) {
     return function(x) {
       var n = -1, y = 0;
-      while (++n < N + 1) {
-        y += A[n] * s((n + 1) * x);
+      while (++n < N) {
+        y += A[n] * s(τ * (n + 1) * x);
       }
       return y;
     }
@@ -111,21 +117,21 @@ form {
     h = H - margin.top - margin.bottom,
 
     radius = 140,
-    theta  = 0.1,
-    xmax   = 3*π,
+    theta  = 0,
+    xmax   = 2,
     rate   = 1 / 60,
 
-    tDomain = d3.range(0, τ + 1, τ / 1000),   // trace domain
-    gDomain = d3.range(0, xmax + 1, xmax / 1000), // graph domain
+    tDomain = d3.range(0, 1, 1 / 1000),   // trace domain
+    gDomain = d3.range(0, xmax, xmax / 1000), // graph domain
 
     C = types.square, // coeffiecients
-    L = 5,            // size
-    F = 1 / 10,       // frequence
+    L = 6,            // size
+    F = 0.3,          // frequence
 
     yCirc = d3.scale.linear().domain([-1, 1]).range([h/2 + radius, h/2 - radius]),
     xCirc = d3.scale.linear().domain([-1, 1]).range([0, 2 * radius]),
-    xAxis = d3.scale.linear().domain([0, xmax]).range([0, w]),
     rAxis = d3.scale.linear().domain([0, 1]).range([0, radius]),
+    xAxis = d3.scale.linear().domain([0, xmax]).range([radius, W]),
 
     A, Fxy, fx, fy,
 
@@ -161,15 +167,9 @@ form {
   var vis = svg.append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-  var gPath = vis.append("path")
-    .attr("class", "graph")
-    .attr("transform", "translate(" + rAxis(1) + ",0)");
-
-  var tPath = vis.append("path")
-    .attr("class", "trace");
-
-  var line = vis.append("path")
-    .attr("class", "proj");
+  var gPath = vis.append("path").attr("class", "graph");
+  var tPath = vis.append("path").attr("class", "trace");
+  var pPath = vis.append("path").attr("class", "proj");
 
   function cache() {
     if (typeof C === 'function') {
@@ -194,41 +194,66 @@ form {
       var d = data[i] || (data[i] = {x:0,y:0,r:0});
       d.x = f.X(theta);
       d.y = f.Y(theta);
-      d.r = (i < A.length - 1) ? Math.abs(A[i + 1]) : 0;
+      d.r = Math.abs(A[i]);
+      d.f = i / τ;
     });
     data.length = Fxy.length;
   }
 
-  function draw() {
+  function circles() {
+    var c = vis.selectAll(".coeff").data(data);
+    c.exit().remove();
+    c.enter().append("circle").attr("class", "coeff");
+    return c;
+  }
+
+  function dots() {
+    var d = vis.selectAll(".dot").data(data);
+    d.exit().remove();
+    d.enter().append("circle").attr("class", "dot").attr("r", 3);
+    return d;
+  }
+
+  function drawGraph() {
     calc();
 
-    var main = vis.selectAll('.main').data([A[0]])
-      .attr("r", rAxis)
-    main.enter().append("circle")
-      .attr("class", "main")
-      .attr("cx", xCirc(0))
-      .attr("cy", yCirc(0));
-
-    var circles = vis.selectAll(".coeff").data(data)
+    circles()
       .attr("cx", function(d) { return xCirc(d.x); })
       .attr("cy", function(d) { return yCirc(d.y); })
-      .attr("r",  function(d) { return rAxis(d.r); });
-    circles.exit().remove();
-    circles.enter().append("circle")
-      .attr("class", "coeff");
+      .attr("r",  function(d) { return rAxis(d.r); })
+      .classed("last", function(d, i) { return i === L - 1; })
+      .classed("first", function(d, i) { return i === 0; });
 
-    var dots = vis.selectAll(".dot").data(data)
+    dots()
       .attr("cx", function(d) { return xCirc(d.x); })
       .attr("cy", function(d) { return yCirc(d.y); })
+      .classed("hide", function(d) { return d.r === 0; })
       .classed("last", function(d, i) { return i === L - 1; });
-    dots.exit().remove();
-    dots.enter().append("circle")
-      .attr("class", "dot")
-      .attr("r", 3);
 
     var last = data[data.length - 1];
-    line.attr("d", proj([last, {x:0,y:last.y}]));
+    pPath.attr("d", proj([last, {x:0,y:last.y}]));
     gPath.attr("d", graph(gDomain));
+  }
+
+  var draw;
+
+  function drawHisto() {
+    calc();
+
+    circles().transition()
+      .attr("cx", function(d) { return xAxis(d.f); })
+      .attr("cy", yCirc(0))
+      .attr("r",  function(d) { return rAxis(d.r); });
+
+    dots()
+      .classed("hide", function(d) { return d.r === 0; })
+      .transition()
+      .attr("cx", function(d) { return xAxis(d.f); })
+      .attr("cy", yCirc(0));
+
+    pPath.attr("d", "");
+    tPath.attr("d", "");
+    gPath.attr("d", "");
   }
 
   function redraw() {
@@ -238,9 +263,10 @@ form {
 
   function play() {
     if (timer) return;
+    draw = drawGraph;
     (function loop() {
       draw();
-      theta += 2 * π * F * rate;
+      theta += F * rate;
       timer = setTimeout(loop, rate * 1000);
     })();
   }
@@ -249,6 +275,8 @@ form {
     if (!timer) return;
     clearTimeout(timer);
     timer = null;
+    draw = drawHisto;
+    draw();
   }
 
   d3.select("#play").on("change", function() { this.checked ? play() : pause(); });
