@@ -6,7 +6,7 @@ body {
   font: 13px/13px "Helvetica Neue", Helvetica, Arial, sans-serif;
   margin: auto;
   position: relative;
-  width: 1080px;
+  width: 960px;
 }
 form {
   position: absolute;
@@ -18,10 +18,10 @@ form {
   stroke: hsl(0, 0%, 30%);
 }
 .dot {
-  fill: hsla(0, 100%, 34%, 0.2);
+  fill: hsla(207, 63%, 27%, 0.2);
 }
 .dot.last {
-  fill: hsla(0, 100%, 34%, 1.0);
+  fill: hsla(207, 63%, 27%, 1.0);
 }
 .coeff {
   fill: none;
@@ -29,12 +29,12 @@ form {
 }
 .graph {
   fill: none;
-  stroke: hsl(0, 100%, 34%);
+  stroke: steelblue;
   stroke-width: 3px;
 }
 .trace {
   fill: none;
-  stroke: hsl(0, 0%, 34%);
+  stroke: steelblue;
 }
 .proj {
   fill: none;
@@ -66,6 +66,7 @@ form {
   'use strict';
 
   var π = Math.PI
+  var τ = 2 * Math.PI
 
   var types = {
     square: function(n) {
@@ -104,16 +105,18 @@ form {
 
   var
     margin = {top: 40, right: 100, bottom: 40, left: 150},
-    W = 1080,
+    W = 960,
     H = 500,
     w = W - margin.left - margin.right,
     h = H - margin.top - margin.bottom,
 
     radius = 140,
     theta  = 0.1,
-    xmax   = 3 * π,
-    domain = d3.range(0, xmax, xmax / 1000),
+    xmax   = 3*π,
     rate   = 1 / 60,
+
+    tDomain = d3.range(0, τ + 1, τ / 1000),   // trace domain
+    gDomain = d3.range(0, xmax + 1, xmax / 1000), // graph domain
 
     C = types.square, // coeffiecients
     L = 5,            // size
@@ -182,7 +185,7 @@ form {
       return { X: FT(i, Math.cos), Y: FT(i, Math.sin) };
     });
 
-    tPath.attr("d", trace(domain));
+    tPath.attr("d", trace(tDomain));
   }
 
   function calc() {
@@ -202,9 +205,9 @@ form {
     var main = vis.selectAll('.main').data([A[0]])
       .attr("r", rAxis)
     main.enter().append("circle")
-        .attr("class", "main")
-        .attr("cx", xCirc(0))
-        .attr("cy", yCirc(0));
+      .attr("class", "main")
+      .attr("cx", xCirc(0))
+      .attr("cy", yCirc(0));
 
     var circles = vis.selectAll(".coeff").data(data)
       .attr("cx", function(d) { return xCirc(d.x); })
@@ -225,10 +228,13 @@ form {
 
     var last = data[data.length - 1];
     line.attr("d", proj([last, {x:0,y:last.y}]));
-    gPath.attr("d", graph(domain));
+    gPath.attr("d", graph(gDomain));
   }
 
-  play();
+  function redraw() {
+    cache();
+    draw();
+  }
 
   function play() {
     if (timer) return;
@@ -246,9 +252,11 @@ form {
   }
 
   d3.select("#play").on("change", function() { this.checked ? play() : pause(); });
-  d3.select("#freq").on("change", function() { F = +this.value; cache(); draw();h });
-  d3.select("#size").on("change", function() { L = +this.value; cache(); draw(); });
-  d3.select("#type").on("change", function() { C = types[this.value]; cache(); draw(); });
+  d3.select("#freq").on("change", function() { F = +this.value; redraw(); });
+  d3.select("#size").on("change", function() { L = +this.value; redraw(); });
+  d3.select("#type").on("change", function() { C = types[this.value]; redraw(); });
+
+  play();
 
 })();
 </script>
