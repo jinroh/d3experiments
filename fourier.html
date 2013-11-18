@@ -16,21 +16,21 @@ form {
 .hide {
   display: none;
 }
-.dot {
+.coeff .dot {
   fill: hsla(207, 63%, 27%, 0.2);
 }
-.dot.last {
+.coeff.last .dot {
   fill: hsla(207, 63%, 27%, 1.0);
 }
-.coeff {
+.coeff .circle {
   fill: none;
   stroke: hsl(0, 0%, 70%);
 }
-.coeff.first {
+.coeff.first .circle {
   fill: none;
   stroke: hsl(0, 0%, 30%);
 }
-.coeff.last {
+.coeff.last .circle {
   display: none;
 }
 .graph {
@@ -54,7 +54,6 @@ form {
 <body>
 <form>
   <p>
-    <input id="play" type="checkbox" value="1" checked>
     <select id="type">
       <option value="square">Square</option>
       <option value="triangle">Triangle</option>
@@ -62,14 +61,14 @@ form {
       <option value="fibonacci">Fibonacci</option>
       <option value="pulse">Pulse</option>
     </select>
+    <input id="size" type="number" value="6" min="1" max="40" step="1">
   </p>
-  <p><input id="size" type="range" value="6" min="1" max="100" step="1"> <label>Precision</label></p>
   <p><input id="freq" type="range" value="0.3" min="0.01" max="0.5" step="0.01"> <label>Speed</label></p>
 </form>
 <script src="d3.js"></script>
 <script>
 (function() {
-  'use strict';
+  "use strict";
 
   var π = Math.PI
   var τ = 2 * Math.PI
@@ -99,14 +98,24 @@ form {
     }
   };
 
-  function FT(N, s) {
+  function FT(A, N, φ) {
+    φ = φ || 0;
     return function(x) {
       var n = -1, y = 0;
       while (++n < N) {
-        y += A[n] * s(τ * (n + 1) * x);
+        y += A[n] * Math.sin(τ * (n + 1) * x + φ);
       }
       return y;
     }
+  }
+
+  function once(fn) {
+    var exec = false;
+    return function() {
+      if (exec) return;
+      exec = true,
+      fn && fn();
+    };
   }
 
   var
@@ -118,10 +127,10 @@ form {
 
     radius = 140,
     theta  = 0,
-    xmax   = 2,
+    xmax   = 1.5,
     rate   = 1 / 60,
 
-    tDomain = d3.range(0, 1, 1 / 1000),   // trace domain
+    tDomain = d3.range(0, 1.1, 1 / 1000),   // trace domain
     gDomain = d3.range(0, xmax, xmax / 1000), // graph domain
 
     C = types.square, // coeffiecients
@@ -131,11 +140,11 @@ form {
     yCirc = d3.scale.linear().domain([-1, 1]).range([h/2 + radius, h/2 - radius]),
     xCirc = d3.scale.linear().domain([-1, 1]).range([0, 2 * radius]),
     rAxis = d3.scale.linear().domain([0, 1]).range([0, radius]),
-    xAxis = d3.scale.linear().domain([0, xmax]).range([radius, W]),
+    xAxis = d3.scale.linear().range([radius, W - margin.left]),
 
-    A, Fxy, fx, fy,
+    Fxy, fx, fy,
 
-    timer, data = [];
+    draw, timer, data = [];
 
   var graph = d3.svg.line()
     .x(function(d) { return xAxis(d); })
@@ -149,43 +158,50 @@ form {
     .x(function(d) { return xCirc(fx(d)); })
     .y(function(d) { return yCirc(fy(d)); });
 
+  function gTransform(d) {
+    return "translate(" + xCirc(d.x) + "," + yCirc(d.y) + ")";
+  }
+
+  function hTransform(d) {
+    return "translate(" + xAxis(d.f) + "," + yCirc(0) + ")";
+  }
+
   var svg = d3.select("body")
     .append("svg")
       .attr("width", W)
       .attr("height", H)
 
-  svg.append('line')
-    .attr('class', 'axis')
-    .attr('y1', margin.top + yCirc(0)).attr('x1', 0)
-    .attr('y2', margin.top + yCirc(0)).attr('x2', W);
+  svg.append("line")
+    .attr("class", "axis")
+    .attr("y1", margin.top + yCirc(0)).attr("x1", 0)
+    .attr("y2", margin.top + yCirc(0)).attr("x2", W);
 
-  svg.append('line')
-    .attr('class', 'axis')
-    .attr('x1', margin.left + xCirc(0)).attr('y1', 0)
-    .attr('x2', margin.left + xCirc(0)).attr('y2', H);
+  svg.append("line")
+    .attr("class", "axis")
+    .attr("x1", margin.left + xCirc(0)).attr("y1", 0)
+    .attr("x2", margin.left + xCirc(0)).attr("y2", H);
 
   var vis = svg.append("g")
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
   var gPath = vis.append("path").attr("class", "graph");
   var tPath = vis.append("path").attr("class", "trace");
   var pPath = vis.append("path").attr("class", "proj");
 
   function cache() {
-    if (typeof C === 'function') {
+    var A;
+    if (typeof C === "function") {
       A = d3.range(1, L + 1).map(C);
     } else {
       A = C.slice(0, L);
     }
 
-    fx = FT(L - 1, Math.cos);
-    fy = FT(L - 1, Math.sin),
+    fx = FT(A, L - 1, π/2);
+    fy = FT(A, L - 1, 0),
 
     Fxy = A.map(function(a, i) {
-      return { X: FT(i, Math.cos), Y: FT(i, Math.sin) };
+      return { X: FT(A, i, π/2), Y: FT(A, i, 0), r: Math.abs(a) };
     });
-
-    tPath.attr("d", trace(tDomain));
   }
 
   function calc() {
@@ -194,78 +210,81 @@ form {
       var d = data[i] || (data[i] = {x:0,y:0,r:0});
       d.x = f.X(theta);
       d.y = f.Y(theta);
-      d.r = Math.abs(A[i]);
-      d.f = i / τ;
+      d.r = f.r;
+      d.f = i + 1;
     });
     data.length = Fxy.length;
+    return data;
   }
 
-  function circles() {
-    var c = vis.selectAll(".coeff").data(data);
-    c.exit().remove();
-    c.enter().append("circle").attr("class", "coeff");
-    return c;
-  }
+  function coeff() {
+    var co = vis.selectAll(".coeff").data(calc());
 
-  function dots() {
-    var d = vis.selectAll(".dot").data(data);
-    d.exit().remove();
-    d.enter().append("circle").attr("class", "dot").attr("r", 3);
-    return d;
+    // exit
+    co.exit().remove();
+
+    // enter
+    var en = co.enter().append("g").attr("class", "coeff");
+
+    en.append("circle").attr("class", "circle");
+    en.append("circle").attr("class", "dot").attr("r", 3);
+
+    // update
+    co.classed("last",  function(d, i) { return i === L - 1; });
+    co.classed("first", function(d, i) { return i === 0; });
+
+    co.select(".circle").attr("r", function(d) { return rAxis(d.r); })
+
+    return co;
   }
 
   function drawGraph() {
-    calc();
-
-    circles()
-      .attr("cx", function(d) { return xCirc(d.x); })
-      .attr("cy", function(d) { return yCirc(d.y); })
-      .attr("r",  function(d) { return rAxis(d.r); })
-      .classed("last", function(d, i) { return i === L - 1; })
-      .classed("first", function(d, i) { return i === 0; });
-
-    dots()
-      .attr("cx", function(d) { return xCirc(d.x); })
-      .attr("cy", function(d) { return yCirc(d.y); })
-      .classed("hide", function(d) { return d.r === 0; })
-      .classed("last", function(d, i) { return i === L - 1; });
-
+    xAxis.domain([0, xmax]);
+    coeff().attr("transform", gTransform);
     var last = data[data.length - 1];
     pPath.attr("d", proj([last, {x:0,y:last.y}]));
     gPath.attr("d", graph(gDomain));
+    tPath.attr("d", trace(tDomain));
   }
-
-  var draw;
 
   function drawHisto() {
-    calc();
-
-    circles().transition()
-      .attr("cx", function(d) { return xAxis(d.f); })
-      .attr("cy", yCirc(0))
-      .attr("r",  function(d) { return rAxis(d.r); });
-
-    dots()
-      .classed("hide", function(d) { return d.r === 0; })
-      .transition()
-      .attr("cx", function(d) { return xAxis(d.f); })
-      .attr("cy", yCirc(0));
-
-    pPath.attr("d", "");
-    tPath.attr("d", "");
-    gPath.attr("d", "");
+    xAxis.domain([1, L]);
+    coeff().attr("transform", hTransform);
   }
 
-  function redraw() {
-    cache();
-    draw();
+  function toggle(callback) {
+    var tran;
+    tran = (draw === drawGraph) ? hTransform : gTransform;
+    draw = (draw === drawGraph) ? drawHisto : drawGraph;
+    coeff().transition()
+      .duration(1000)
+      .attr("transform", tran)
+      .each("end", once(callback));
+  }
+
+
+  function toggleGraph() {
+    xAxis.domain([0, xmax]);
+    toggle(function() {
+      pPath.classed("hide", false);
+      gPath.classed("hide", false);
+      tPath.classed("hide", false);
+      play();
+    });
+  }
+
+  function toggleHisto() {
+    xAxis.domain([1, L]);
+    pPath.classed("hide", true);
+    gPath.classed("hide", true);
+    tPath.classed("hide", true);
+    pause(); toggle(drawHisto);
   }
 
   function play() {
     if (timer) return;
-    draw = drawGraph;
     (function loop() {
-      draw();
+      drawGraph();
       theta += F * rate;
       timer = setTimeout(loop, rate * 1000);
     })();
@@ -275,15 +294,18 @@ form {
     if (!timer) return;
     clearTimeout(timer);
     timer = null;
-    draw = drawHisto;
-    draw();
   }
 
-  d3.select("#play").on("change", function() { this.checked ? play() : pause(); });
+  function redraw() {
+    cache(); draw();
+  }
+
+  d3.select("svg").on("click", function() { (draw === drawHisto) ? toggleGraph() : toggleHisto(); });
   d3.select("#freq").on("change", function() { F = +this.value; redraw(); });
   d3.select("#size").on("change", function() { L = +this.value; redraw(); });
   d3.select("#type").on("change", function() { C = types[this.value]; redraw(); });
 
+  draw = drawGraph;
   play();
 
 })();
